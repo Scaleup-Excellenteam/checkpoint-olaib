@@ -15,6 +15,15 @@
 #define INVALID_INPUT "Invalid input, try again\n"
 
 #define ALLOC_ERROR "Memory allocation error.\n"
+#define LINE_BREAK "========================================\n"
+
+#define INSERT_PHONE "Enter the phone number of the student: "
+#define INSERT_LEVEL "Enter the level of the student: "
+#define INSERT_CLASS_ID "Enter the class id of the student: "
+#define INSERT_GRADE "Enter the grade of the student in subject %d: "
+#define INSERT_FNAME "Enter the first name of the student: "
+#define INSERT_LNAME "Enter the last name of the student: "
+
 
 const char* SUBJECTS_NAMES[NUM_COURSES] = {
     "Mathematics", "English", "Cpp","Python", "Java", "C", "C#", "PHP", "HTML", "CSS"
@@ -58,6 +67,10 @@ void initDb();
 void displayMenu();
 void searchStudentByFnameByLName();
 void freeMemory();
+void readFirstNameLastName(char* fName, char* lName);
+bool readInput(char* var, int max_len, int min_len, char* msg, char* error_msg);
+bool readDigitInput(int* var, int min, int max, char* msg, char* error_msg);
+void displaySubjects(struct student* student);
 
 // ======================= Main Function =======================
 
@@ -137,24 +150,55 @@ void displayStudents() {
             }
         }
     }
-    printf("=========================================\n");
+    printf(LINE_BREAK);
+}
+
+bool readInput(char* var, int max_len, int min_len, char* msg, char* error_msg) {
+    printf("%s", msg);
+    if (scanf("%s", var) != 1 || strlen(var) < min_len || strlen(var) > max_len) {
+        perror(error_msg);
+        return false;
+    }
+    return true;
+}
+
+bool readDigitInput(int* var, int min, int max, char* msg, char* error_msg) {
+    printf("%s", msg);
+    if (scanf("%d", var) != 1 || *var < min || *var > max) {
+        perror(error_msg);
+        return false;
+    }
+    return true;
 }
 
 void insertStudent() {
     char fName[MAX_LEN], lName[MAX_LEN], phone[PHONE_LEN];
     int level, class_id;
     int grades[NUM_CLASSES];
+    bool is_valid_input = false;
+    while (!is_valid_input)
+    {
+        readFirstNameLastName(fName, lName);
+        is_valid_input = true;
 
-    printf("Enter the first name of the student: ");
-    scanf("%s", fName);
-    printf("Enter the last name of the student: ");
-    scanf("%s", lName);
-    printf("Enter the phone number of the student: ");
-    scanf("%s", phone);
-    printf("Enter the level of the student: ");
-    scanf("%d", &level);
-    printf("Enter the class id of the student: ");
-    scanf("%d", &class_id);
+        if (!readInput(phone, PHONE_LEN, PHONE_LEN, INSERT_PHONE, "Invalid phone number.\n"))
+        {
+            is_valid_input = false;
+            continue;
+        }
+
+        if (!readDigitInput(&level, 1, NUM_LEVELS, INSERT_LEVEL, "Invalid level.\n"))
+        {
+            is_valid_input = false;
+            continue;
+        }
+
+        if (!readDigitInput(&class_id, 1, NUM_CLASSES, INSERT_CLASS_ID, "Invalid class id.\n"))
+        {
+            is_valid_input = false;
+            continue;
+        }
+    }
 
     struct student* new_student = malloc(sizeof(struct student));
     if (new_student == NULL) {
@@ -180,19 +224,17 @@ void insertStudent() {
 }
 
 void deleteStudent() {
-    char fName[MAX_LEN], lName[MAX_LEN];
-    printf("Enter the first name of the student: ");
-    scanf("%s", fName);
-    printf("Enter the last name of the student: ");
-    scanf("%s", lName);
+    char firstName[MAX_LEN], lastName[MAX_LEN];
+    readFirstNameLastName(firstName, lastName);
+
 
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
             struct student* prev_student = NULL;
             while (current_student != NULL) {
-                if (strcmp(current_student->fName, fName) == 0 &&
-                    strcmp(current_student->lName, lName) == 0) {
+                if (strcmp(current_student->fName, firstName) == 0 &&
+                    strcmp(current_student->lName, lastName) == 0) {
                     if (prev_student != NULL)
                         prev_student->next = current_student->next;
                     else
@@ -210,13 +252,27 @@ void deleteStudent() {
     printf("Student not found.\n");
 }
 
+void readFirstNameLastName(char* fName, char* lName) {
+    char names[2][MAX_LEN];
+    bool is_valid_input = false;
+    while (!is_valid_input) {
+        for (int i = 0; i < 2; i++) {
+            char* msg = (i == 0 ? INSERT_FNAME : INSERT_LNAME);
+            if (!readInput(names[i], MAX_LEN, 1, msg, "Invalid name, try again\n"))
+            {
+                is_valid_input = false;
+                continue;
+            }
+        }
+        is_valid_input = true;
+    }
+    strncpy(fName, names[0], MAX_LEN);
+    strncpy(lName, names[1], MAX_LEN);
+}
+
 void updateStudent() {
     char fName[MAX_LEN], lName[MAX_LEN];
-    printf("Enter the first name of the student: ");
-    scanf("%s", fName);
-    printf("Enter the last name of the student: ");
-    scanf("%s", lName);
-
+    readFirstNameLastName(fName, lName);
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
@@ -247,10 +303,7 @@ void updateStudent() {
 
 void searchStudentByFnameByLName() {
     char fName[MAX_LEN], lName[MAX_LEN];
-    printf("Enter the first name of the student: ");
-    scanf("%s", fName);
-    printf("Enter the last name of the student: ");
-    scanf("%s", lName);
+    readFirstNameLastName(fName, lName);
 
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
@@ -322,9 +375,9 @@ void displayInfo(struct student* student, bool full_info) {
     printf("Name: %s %s\n", student->fName, student->lName);
 
     if (full_info) {
-        displaySubjects(student);
         printf("Phone: %s\n", student->phone);
         printf("Level: %d\n", student->level);
+        displaySubjects(student);
     }
-    printf("=========================================\n");
+    printf(LINE_BREAK);
 }
