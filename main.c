@@ -4,35 +4,25 @@
 #include <stdlib.h>
 
 #define MAX_LEN 50
-#define NUM_COURSES 20
+#define NUM_COURSES 10
 #define NUM_CLASSES 10
 #define NUM_LEVELS 7
 #define PHONE_LEN 11
 #define DB_INPUT_FILE "students.txt"
+
 #define ERROR_OPENING_FILE "Error opening file"
+
 #define INVALID_INPUT "Invalid input, try again\n"
+
 #define ALLOC_ERROR "Memory allocation error.\n"
-#define MENU "Welcome to the Student Management System 2023\n"\
-             "1. Display all students\n"\
-             "2. Insert a new student\n"\
-             "3. Delete a student\n"\
-             "4. Update a student\n"\
-             "5. Search By first name and last name (display information)\n"\
-             "6. Exit\n"\
-             "Please enter your choice: 1 - 6\n"
-void clrscr();
-void updateStudent();
-void deleteStudent();
-void insertStudent();
-void displayStudents();
-void initDb();
-void displayMenu();
-void searchStudentByFnameByLName();
-void freeMemory();
+
+const char* SUBJECTS_NAMES[NUM_COURSES] = {
+    "Mathematics", "English", "Cpp","Python", "Java", "C", "C#", "PHP", "HTML", "CSS"
+};
 
 
 struct course {
-    int subject_id; // The subject ID is used as an index in the subject_map
+    int subject_id;
     int grade;
 };
 
@@ -45,17 +35,31 @@ struct student {
     struct student* next;
 };
 
-struct subject_map {
+struct subjectName {
     char name[MAX_LEN];
 };
 
 struct school {
     struct student* DB[NUM_LEVELS][NUM_CLASSES];
     int num_students;
-    struct subject_map subjects[NUM_COURSES];
+    struct subjectName subjects[NUM_COURSES];
 };
 
 static struct school S;
+
+// ======================= Function Prototypes =======================
+void clrscr();
+void updateStudent();
+void deleteStudent();
+void insertStudent();
+void displayStudents();
+void displayInfo(struct student* student, bool full_info);
+void initDb();
+void displayMenu();
+void searchStudentByFnameByLName();
+void freeMemory();
+
+// ======================= Main Function =======================
 
 int main() {
     initDb();
@@ -85,9 +89,9 @@ void initDb() {
             return;
         }
 
-        strcpy(new_student->fName, fName);
-        strcpy(new_student->lName, lName);
-        strcpy(new_student->phone, phone);
+        strncpy(new_student->fName, fName, MAX_LEN);
+        strncpy(new_student->lName, lName, MAX_LEN);
+        strncpy(new_student->phone, phone, PHONE_LEN);
         new_student->level = level;
 
         for (int i = 0; i < NUM_CLASSES; i++) {
@@ -105,16 +109,10 @@ void initDb() {
         S.num_students++;
     }
 
-    // Initializing the subject_map 
-    const char* subjectNames[NUM_COURSES] = {
-        "Mathematics", "English", "Science", "History", "Internet Programming",
-        "Physics", "Chemistry", "Biology", "Geography", "Literature",
-        "Physical Education", "Art", "Music","Economics", "Python",
-        "Foreign Language", "Health", "Cpp", "Psychology", "Sociology"
-    };
 
-
-    struct subject_map* current_subject = S.subjects;
+    for (int i = 0; i < NUM_COURSES; i++) {
+        strncpy(S.subjects[i].name, SUBJECTS_NAMES[i], MAX_LEN);
+    }
 
     fclose(file);
 }
@@ -122,23 +120,19 @@ void initDb() {
 void displaySubjects(struct student* student) {
     printf("Subjects:\n");
     for (int i = 0; i < NUM_COURSES; i++) {
-        int subject_id = student->courses[i].subject_id;
-        printf("%s: %d\n", S.subjects[subject_id].name, student->courses[i].grade);
+        printf("%s: %d\n", S.subjects[i].name, student->courses[i].grade);
     }
 }
 
 void displayStudents() {
+    int count = 0;
     printf("=========== List of Students: ===========\n");
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
             while (current_student != NULL) {
-                printf("First Name: %s, Last Name: %s\n",
-                    current_student->fName, current_student->lName);
-                printf("Phone: %s\n", current_student->phone);
-                printf("Level: %d\n", current_student->level);
-                displaySubjects(current_student);
-                printf("\n");
+                printf("%d. ", ++count);
+                displayInfo(current_student, false);
                 current_student = current_student->next;
             }
         }
@@ -168,9 +162,9 @@ void insertStudent() {
         return;
     }
 
-    strcpy(new_student->fName, fName);
-    strcpy(new_student->lName, lName);
-    strcpy(new_student->phone, phone);
+    strncpy(new_student->fName, fName, MAX_LEN);
+    strncpy(new_student->lName, lName, MAX_LEN);
+    strncpy(new_student->phone, phone, PHONE_LEN);
     new_student->level = level;
 
     for (int i = 0; i < NUM_CLASSES; i++) {
@@ -264,19 +258,12 @@ void searchStudentByFnameByLName() {
             while (current_student != NULL) {
                 if (strcmp(current_student->fName, fName) == 0 &&
                     strcmp(current_student->lName, lName) == 0) {
-                    printf("First Name: %s, Last Name: %s\n",
-                        current_student->fName, current_student->lName);
-                    printf("Phone: %s\n", current_student->phone);
-                    printf("Level: %d\n", current_student->level);
-                    displaySubjects(current_student);
-                    printf("\n");
-                    return;
+                    displayInfo(current_student, true);
                 }
                 current_student = current_student->next;
             }
         }
     }
-    printf("Student not found.\n");
 }
 
 void freeMemory() {
@@ -294,9 +281,16 @@ void freeMemory() {
 
 void displayMenu() {
     char choice;
-    while (true) {
+    while (1) {
         //clrscr();
-        printf(MENU);
+        printf("Welcome to the Student Management System 2023\n");
+        printf("1. Display all students\n");
+        printf("2. Insert a new student\n");
+        printf("3. Delete a student\n");
+        printf("4. Update a student\n");
+        printf("5. Search By first name and last name (display information)\n");
+        printf("6. Exit\n");
+        printf("Please enter your choice: 1 - 6\n");
         scanf(" %c", &choice);
         switch (choice) {
         case '1':
@@ -322,4 +316,15 @@ void displayMenu() {
             break;
         }
     }
+}
+
+void displayInfo(struct student* student, bool full_info) {
+    printf("Name: %s %s\n", student->fName, student->lName);
+
+    if (full_info) {
+        displaySubjects(student);
+        printf("Phone: %s\n", student->phone);
+        printf("Level: %d\n", student->level);
+    }
+    printf("=========================================\n");
 }
