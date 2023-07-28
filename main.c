@@ -48,7 +48,7 @@
         "9. Exit\n"\
         "Please enter your choice: 1 - 9\n"
 
-#define HASH_TABLE_SIZE 10007
+#define HASH_TABLE_SIZE 46
 
 typedef struct GradeNode {
     struct student* student;
@@ -87,7 +87,6 @@ struct school {
 const char* SUBJECTS_NAMES[NUM_COURSES] = { "Mathematics", "English", "Cpp","Python", "Java", "C", "C#", "PHP", "HTML", "CSS" };
 char* ALLOCATED_INPUT = NULL;
 size_t ALlOC_SIZE = 0;
-struct student* STUDENT = NULL;
 
 static struct school S;
 
@@ -110,7 +109,6 @@ void clrscr();
 void freeMemory();
 void alloc_check(void* ptr);
 bool is_user_confirmed();
-
 void displayStudents();
 void displayInfo(struct student* student, bool full_info);
 void displayMenu();
@@ -123,8 +121,11 @@ void extractFile();
 void deleteStudent();
 void getTopStudents();
 void updateStudent();
-void display_students_candidates();
+// void quickSelect(struct student* arr[], int low, int high, int k, int subject_id);
+// int partition(struct student* arr[], int low, int high, int subject_id);
 double claculate_average(struct student* student);
+bool check_if_failed_in_course(struct student* student);
+void display_candidates();
 
 // ======================== Main Function ========================
 
@@ -132,7 +133,7 @@ int main() {
     init_db();
     displayMenu();
     atexit(freeMemory);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 // ======================== Function Implementations ========================
@@ -173,7 +174,7 @@ void displayMenu() {
             getTopStudents();
             break;
         case '7':
-            display_students_candidates();
+            display_candidates();
             break;
         case '8':
             extractFile();
@@ -199,6 +200,7 @@ void searchStudentBy() {
     if (student != NULL) {
         printf(STUDENT_FOUND);
         displayInfo(student, true);
+        printf(LINE_BREAK);
     }
 }
 // ===========================================================================
@@ -248,11 +250,8 @@ void init_db() {
     memset(S.DB, 0, sizeof(S.DB));// initialize the DB to NULL
 
     while (fscanf(file, "%s %s %s %d %d", fName, lName, phone, &level, &class_id) == 5) {
-        struct student* new_student = malloc(sizeof(struct student));
-        if (new_student == NULL) {
-            printError(ALLOC_ERROR);
-            exit(EXIT_FAILURE);
-        }
+        struct student* new_student = (student*)malloc(sizeof(struct student));
+        alloc_check(new_student);
 
         strncpy(new_student->fName, fName, MAX_LEN);
         strncpy(new_student->lName, lName, MAX_LEN);
@@ -288,6 +287,17 @@ void init_db() {
     fclose(file);
 }
 // ===========================================================================
+// This function is used to display the students in pages
+bool isNextPage(int* count) {
+    bool isContinue = true;
+    if (*count == STUDENTS_PER_PAGE) {
+        *count = 0;
+        printf("Press Enter to continue...\n");
+        isContinue = (getc(stdin) == '\n');
+    }
+    return isContinue;
+}
+
 FILE* open_file(const char* mode, const char* file_name) {
     FILE* file = fopen(file_name, mode);
 
@@ -301,36 +311,34 @@ FILE* open_file(const char* mode, const char* file_name) {
 void printError(const char* message) {
     fprintf(stderr, "%s", message);
 }
+// display the total number of students
+void displayTotalStudents(int count) {
+    printf("Total students: %d\n", count);
+}
 
 void displayStudents() {
-    int count = 0;
-    int page = 1;
-    int total_students = 0;
+    int count = 0, total_students = 0;
     printf("=========== List of Students: ===========\n");
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
             while (current_student != NULL) {
-                total_students++;
                 count++;
-                printf("%d. ", total_students);
+                printf("%d. ", total_students++);
                 displayInfo(current_student, false);
+                printf(LINE_BREAK);
                 current_student = current_student->next;
-
-                if (count == STUDENTS_PER_PAGE) {
-                    count = 0;
-                    printf("Page %d of %d (Press Enter to continue...(or any other key to exit)\n", page, (total_students / STUDENTS_PER_PAGE) + 1);
-                    char c = getchar();
-                    if (c != '\n') {
-                        return;
-                    }
-                    page++;
-                }
+                if (!isNextPage(&count))
+                    break;
             }
         }
     }
-    printf("Total students: %d\n", total_students);
+    displayTotalStudents(total_students);
 }
+
+
+
+
 
 void displayInfo(struct student* student, bool full_info) {
     printf("Name: %s %s\n", student->fName, student->lName);
@@ -339,11 +347,9 @@ void displayInfo(struct student* student, bool full_info) {
         printf("Phone: %s\n", student->phone);
         printf("Level: %d\n", student->level);
         printf("------- Subjects-------\n");
-        for (int i = 0; i < NUM_COURSES; i++) {
+        for (int i = 0; i < NUM_COURSES; i++)
             printf("%d. %s: %d\n", i, SUBJECTS_NAMES[i], student->courses[i].grade);
-        }
     }
-    printf(LINE_BREAK);
 }
 
 void clrscr() {
@@ -353,7 +359,6 @@ void clrscr() {
 void freeMemory() {
     printf("Freeing memory...\n");
     free(ALLOCATED_INPUT);
-    free(STUDENT);
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
@@ -455,6 +460,9 @@ struct student* findByFullName(char* fName, char* lName, int class_id) {
     printf(STUDENT_NOT_FOUND);
     return NULL;
 }
+void initHashMap(HashMap* hashMap) {
+    memset(hashMap, 0, sizeof(HashMap));
+}
 
 void deleteStudent() {
     printf("<::: Delete a student :::>\n");
@@ -466,6 +474,7 @@ void deleteStudent() {
         return;
     printf(STUDENT_FOUND);
     displayInfo(student, true);
+    printf(LINE_BREAK);
     // ask user for confirmation
     printf(DELETE_CONFIRMATION);
     if (is_user_confirmed()) {
@@ -492,6 +501,7 @@ void updateStudent() {
         return;
     printf(STUDENT_FOUND);
     displayInfo(student, true);
+    printf(LINE_BREAK);
     // ask user for confirmation
     printf(UPDATE);
     printf("first name? (y/n): ");
@@ -533,9 +543,44 @@ double claculate_average(struct student* student) {
     return average / NUM_COURSES;
 }
 
+bool check_if_failed_in_course(struct student* student) {
+    for (int i = 0; i < NUM_COURSES; i++)
+        if (student->courses[i].grade < MIN_GRADE)
+            return true;
+
+    return false;
+}
+
+// Function to find candidates with average < 60 or grades < 55 
+void display_candidates() {
+    printf("<::: Display candidates :::>\n");
+    int count = 0;
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
+            struct student* current_student = S.DB[level][class_id];
+            while (current_student != NULL) {
+                double average = claculate_average(current_student);
+                bool has_failed_course = check_if_failed_in_course(current_student);
+                if (average < MIN_AVERAGE || has_failed_course) {
+                    count++;
+                    displayInfo(current_student, false);
+                    printf("Average: %.2lf\n", average);
+                    printf("Has failed course: %s\n", has_failed_course ? "Yes" : "No");
+                    printf(LINE_BREAK);
+                }
+                current_student = current_student->next;
+                if (!isNextPage(&count))
+                    break;
+            }
+        }
+    }
+    displayTotalStudents(count);
+}
+// ===========================================================================
  //function to create a new GradeNode
 GradeNode* createGradeNode(struct student* student) {
     GradeNode* newNode = (GradeNode*)malloc(sizeof(GradeNode));
+    check_alloc(newNode);
     newNode->student = student;
     newNode->next = NULL;
     return newNode;
@@ -551,45 +596,40 @@ GradeNode* insertGradeNode(GradeNode* head, struct student* student) {
 // Function to retrieve the top 10 students
 void getTopStudentsFromGradeList(GradeNode* head) {
     int count = 0;
-    while (head != NULL && count < 10) {
+    while (head != NULL && count < TOP_STUDENTS_LIMIT) {
         printf("%s %s - {Lvl: %d Grade: %d}\n", head->student->fName, head->student->lName, head->student->level, head->student->courses[0].grade);
         head = head->next;
         count++;
     }
 }
 
-// Function to initialize the hashmap
-void initHashMap(HashMap* hashMap) {
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        hashMap->buckets[i] = NULL;
-    }
-}
+/* Function to hash the grade to an index in the hashmap from 0 to 45
+ * 0 -> grade 55
+ * 45 -> grade 100
+ */
 
-// Function to hash the grade to an index in the hashmap
 int hashGrade(int grade) {
-    return grade % HASH_TABLE_SIZE;
+    return grade - MIN_GRADE;
 }
 
 // Function to insert a student into the hashmap
-void insertStudentToHashMap(HashMap* hashMap, struct student* student) {
-    int level = student->level;
-    int grade = student->courses[0].grade;
-
+void insertStudentToHashMap(HashMap* hashMap, struct student* student, int subject_id) {
+    int grade = student->courses[subject_id].grade;
     int index = hashGrade(grade);
-
     // Insert the student to the linked list at the corresponding index
     hashMap->buckets[index] = insertGradeNode(hashMap->buckets[index], student);
 }
 
 // Function to get the top 10 students for a given level from the hashmap
 void getTopStudentsForLevel(HashMap* hashMap, int level) {
-    for (int grade = 100; grade >= MIN_GRADE; grade--) {
-        int index = hashGrade(grade);
-        GradeNode* gradeList = hashMap->buckets[index];
+    int count = 0;
+    for (int i = HASH_TABLE_SIZE - 1; i >= 0 && count < TOP_STUDENTS_LIMIT; i--) {
+        GradeNode* gradeList = hashMap->buckets[i];
 
         while (gradeList != NULL) {
             if (gradeList->student->level == level) {
-                getTopStudentsFromGradeList(gradeList);
+                printf("%s %s - {Lvl: %d Grade: %d}\n", gradeList->student->fName, gradeList->student->lName, gradeList->student->level, gradeList->student->courses[0].grade);
+                count++;
                 break;
             }
             gradeList = gradeList->next;
@@ -597,10 +637,21 @@ void getTopStudentsForLevel(HashMap* hashMap, int level) {
     }
 }
 
+/* Function to get the top 10 students for a given subject for each level
+    * 1. Create a hashmap of size 46 (0 - 45)
+    * 2. Iterate over the DB and insert each student into the hashmap
+    * 3. Iterate over the hashmap from the end and retrieve the top 10 students for each level
+*/
 void getTopStudents() {
     printf("<::: Display top 10 students in a subject :::>\n");
     int subject_id;
+    printf("Subjects:\n");
+    for (int i = 0; i < NUM_COURSES; i++) 
+        printf("%d. %s\n", i, SUBJECTS_NAMES[i]);
+
     while (!readDigitInput(&subject_id, 0, NUM_COURSES, "Enter the subject id: ", INVALID_INPUT));
+    getc(stdin);
+    printf("Top 10 students which didn't fail in any course(grade >= %d) in %s:\n", MIN_GRADE, SUBJECTS_NAMES[subject_id]);
     HashMap hashMap;
     initHashMap(&hashMap);
 
@@ -608,63 +659,14 @@ void getTopStudents() {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
             while (current_student != NULL && current_student->courses[subject_id].grade >= MIN_GRADE) {
-                insertStudentToHashMap(&hashMap, current_student);
+                insertStudentToHashMap(&hashMap, current_student, subject_id);
                 current_student = current_student->next;
             }
         }
     }
     printf("Top 10 students in %s:\n", SUBJECTS_NAMES[subject_id]);
-    getTopStudentsForLevel(&hashMap, subject_id);
-    printf("Enter a key to continue...\n");
-    getc(stdin);
-}
-
-
-//Function to check if the student is a candidate (has a failing grade or average less than 60)
-bool isCandidate(struct student* student) {
-    double average = claculate_average(student);
-    if (average < MIN_AVERAGE) {
-        return true;
-    }
-
-    for (int i = 0; i < NUM_COURSES; i++) {
-        if (student->courses[i].grade < MIN_GRADE) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void display_students_candidates() {
-    printf("<::: Display students candidates :::>\n");
-    int count = 0;
-    int page = 1;
-    int total_candidates = 0;
-    printf("=========== List of Candidates: ===========\n");
-    for (int level = 0; level < NUM_LEVELS; level++) {
-        for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
-            struct student* current_student = S.DB[level][class_id];
-            while (current_student != NULL) {
-                if (isCandidate(current_student)) {
-                    total_candidates++;
-                    count++;
-                    printf("%d. ", total_candidates);
-                    displayInfo(current_student, false);
-                    printf("Average: %.2lf\n", claculate_average(current_student));
-                    current_student = current_student->next;
-
-                    if (count == STUDENTS_PER_PAGE) {
-                        count = 0;
-                        printf("Page %d of %d (Press Enter to continue...(or any other key to exit)\n", page, (total_candidates / STUDENTS_PER_PAGE) + 1);
-                        char c = getchar();
-                        if (c != '\n') {
-                            return;
-                        }
-                        page++;
-                    }
-                }
-            }
-        }
+    for (int level = 1; level <= NUM_LEVELS; level++) {
+        printf("Level %d:\n", level);
+        getTopStudentsForLevel(&hashMap, level);
     }
 }
