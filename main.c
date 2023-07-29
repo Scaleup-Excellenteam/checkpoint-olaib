@@ -42,16 +42,17 @@
 #define ERROR_WRITING "Error while writing to file"
 
 #define MAIN "<::: Welcome to the Student Management System :::>\n"\
-        "1. Display all students\n"\
-        "2. Insert a new student\n"\
-        "3. Delete a student\n"\
-        "4. Update a student\n"\
-        "5. Search By first name and last name (display information)\n"\
-        "6. Display top 10 students in a subject\n"\
-        "7. Display students candidates\n"\
+        "0. Display all students\n"\
+        "1. Insert a new student\n"\
+        "2. Delete a student\n"\
+        "3. Update a student\n"\
+        "4. Search By first name and last name (display information)\n"\
+        "5. Display top 10 students in a subject\n"\
+        "6. Display students candidates\n"\
+        "7. Claculating the average per course per level\n"\
         "8. Extract as txt file\n"\
         "9. Exit\n"\
-        "Please enter your choice: 1 - 9\n"
+        "Please enter your choice: 0 - 9\n"
 
 #define HASH_TABLE_SIZE 46
 
@@ -127,7 +128,7 @@ void updateStudent();
 double claculate_average(struct student* student);
 bool check_if_failed_in_course(struct student* student);
 void display_candidates();
-
+void calculateLevelAverages();
 // ======================== Main Function ========================
 
 int main() {
@@ -156,26 +157,29 @@ void displayMenu() {
         choice = (char)getc(stdin);
         getc(stdin);
         switch (choice) {
-        case '1':
+        case '0':
             displayStudents();
             break;
-        case '2':
+        case '1':
             insertStudent();
             break;
-        case '3':
+        case '2':
             deleteStudent();
             break;
-        case '4':
+        case '3':
             updateStudent();
             break;
-        case '5':
+        case '4':
             searchStudentBy();
             break;
-        case '6':
+        case '5':
             getTopStudents();
             break;
-        case '7':
+        case '6':
             display_candidates();
+            break;
+        case '7':
+            calculateLevelAverages();
             break;
         case '8':
             extractFile();
@@ -389,7 +393,7 @@ bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[
     printf("%s", msg);
 
     char buffer[MAX_LEN];
-    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
+    if (fgets(buffer, MAX_LEN, stdin) == NULL) {
         printError(ERROR_READING);
         exit(EXIT_FAILURE);
     }
@@ -687,5 +691,30 @@ void getTopStudents() {
     for (int level = 1; level <= NUM_LEVELS; level++) {
         printf("Level %d:\n", level);
         getTopStudentsForLevel(&hashMap, level);
+    }
+}
+/**
+ * Function to calculate the average per course per level
+*/
+void calculateLevelAverages() {
+    int total_grades[NUM_LEVELS] = { 0 };
+    int total_courses[NUM_LEVELS] = { 0 };
+
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
+            struct student* current_student = S.DB[level][class_id];
+            while (current_student != NULL) {
+                for (int i = 0; i < NUM_COURSES; i++) {
+                    total_grades[level] += current_student->courses[i].grade;
+                    total_courses[level]++;
+                }
+                current_student = current_student->next;
+            }
+        }
+    }
+    printf("Average per course per level:\n");
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        double average = (double)total_grades[level] / total_courses[level];
+        printf("Level %d: %.2lf\n", level + 1, average);
     }
 }
