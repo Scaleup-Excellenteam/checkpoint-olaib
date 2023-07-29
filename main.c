@@ -143,10 +143,10 @@ int main() {
 bool is_user_confirmed() {
     char c;
     do {
-        getc(stdin);
         c = (char)getc(stdin);
         getc(stdin);
-    } while (c != YES || c != NO);
+    } while (c != YES && c != NO);
+    printf("confirm: %c\n", c);
     return c == YES;
 }
 // ===========================================================================
@@ -213,32 +213,28 @@ void searchStudentBy() {
 void insertStudent() {
     printf("<::: ========== Insert a new student ========= :::>\n");
     int class_id;
-    do {
-        printf(INSERT_NEW_STUDENT);
-        struct student* new_student = (struct student*)malloc(sizeof(struct student));
-        alloc_check(new_student);
-        readFirstNameLastName(new_student->fName, new_student->lName);
-        while (!readInput(new_student->phone, PHONE_LEN, PHONE_LEN, INSERT_PHONE, INVALID_INPUT));
-        while (!readDigitInput(&new_student->level, 1, NUM_LEVELS, INSERT_LEVEL, INVALID_INPUT));
-        while (!readDigitInput(&class_id, 1, NUM_CLASSES, INSERT_CLASS_ID, INVALID_INPUT));
-        // insert grades
-        printf(INSERT_GRADES);
-        for (int i = 0; i < NUM_COURSES; i++) {
-            printf("%s: ", SUBJECTS_NAMES[i]);
-            while (!readDigitInput(&new_student->courses[i].grade, 0, 100, INSERT_GRADE, INVALID_INPUT));
-        }
-        // insert student into the DB
-        new_student->next = S.DB[new_student->level - 1][class_id - 1];
-        new_student->prev = NULL;
-        if (new_student->next != NULL) {
-            new_student->next->prev = new_student;
-        }
-        S.DB[new_student->level - 1][class_id - 1] = new_student;
-        S.num_students++;
-        printf(INSERTED_SUCCESSFULLY);
-        // ask user if he wants to insert another student
-        printf("Do you want to insert another student? (y/n): ");
-    } while (is_user_confirmed());
+    printf(INSERT_NEW_STUDENT);
+    struct student* new_student = (struct student*)malloc(sizeof(struct student));
+    alloc_check(new_student);
+    readFirstNameLastName(new_student->fName, new_student->lName);
+    while (!readInput(new_student->phone, PHONE_LEN, PHONE_LEN, INSERT_PHONE, INVALID_INPUT));
+    while (!readDigitInput(&new_student->level, 1, NUM_LEVELS, INSERT_LEVEL, INVALID_INPUT));
+    while (!readDigitInput(&class_id, 1, NUM_CLASSES, INSERT_CLASS_ID, INVALID_INPUT));
+    // insert grades
+    printf(INSERT_GRADES);
+    for (int i = 0; i < NUM_COURSES; i++) {
+        printf("%s: ", SUBJECTS_NAMES[i]);
+        while (!readDigitInput(&new_student->courses[i].grade, 0, 100, INSERT_GRADE, INVALID_INPUT));
+    }
+    // insert student into the DB
+    new_student->next = S.DB[new_student->level - 1][class_id - 1];
+    new_student->prev = NULL;
+    if (new_student->next != NULL) {
+        new_student->next->prev = new_student;
+    }
+    S.DB[new_student->level - 1][class_id - 1] = new_student;
+    S.num_students++;
+    printf(INSERTED_SUCCESSFULLY);
 }
 // ===========================================================================
 void alloc_check(void* ptr) {
@@ -527,10 +523,9 @@ void updateStudent() {
     displayInfo(student, true);
     printf(LINE_BREAK);
     // ask user for confirmation
-    printf(UPDATE);
     printf("first name? (y/n): ");
     if (is_user_confirmed()) {
-        while (!readInput(student->fName, MAX_LEN, 2, INSERT_FNAME, INVALID_INPUT));
+        while (!readInput(student->fName, MAX_LEN, 2, INSERT_LNAME, INVALID_INPUT));
     }
     printf(UPDATE);
     printf("last name? (y/n): ");
@@ -691,6 +686,15 @@ void getTopStudents() {
     for (int level = 1; level <= NUM_LEVELS; level++) {
         printf("Level %d:\n", level);
         getTopStudentsForLevel(&hashMap, level);
+    }
+    // Free the memory allocated for the hashmap
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        GradeNode* current = hashMap.buckets[i];
+        while (current != NULL) {
+            GradeNode* temp = current;
+            current = current->next;
+            free(temp);
+        }
     }
 }
 /**
