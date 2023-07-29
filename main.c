@@ -103,7 +103,7 @@ typedef bool (*MatchFunc)(struct student*, char*);
 bool fNameMatch(struct student* student, char fName[]);
 bool lNameMatch(struct student* student, char lName[]);
 bool fullNameMatch(struct student* student, char fName[], char lName[]);
-struct student* findByFullName(char fName[], char lName[], int class_id);
+struct student* findByFullName(char fName[], char lName[], int* class_id);
 //void findStudent(MatchFunc match, va_list args);
 void init_db();
 FILE* open_file();
@@ -195,8 +195,9 @@ void displayMenu() {
 void searchStudentBy() {
     printf("<::: Search for a student :::>\n");
     char fName[MAX_LEN], lName[MAX_LEN];
+    int class_id = 0;
     readFirstNameLastName(fName, lName);
-    struct student* student = findByFullName(fName, lName, 0);
+    struct student* student = findByFullName(fName, lName, &class_id);
     if (student != NULL) {
         printf("%s ,lname %s", student->fName, student->lName);
         printf(STUDENT_FOUND);
@@ -386,18 +387,25 @@ void readFirstNameLastName(char fName[], char lName[]) {
 
 bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[]) {
     printf("%s", msg);
-    size_t new_line = getline(&ALLOCATED_INPUT, &ALlOC_SIZE, stdin);
-    if (new_line == -1) {
+
+    char buffer[MAX_LEN];
+    if (fgets(buffer, sizeof(buffer), stdin) == NULL) {
         printError(ERROR_READING);
         exit(EXIT_FAILURE);
     }
-    new_line--;
+
+    int new_line = strlen(buffer);
+    if (new_line > 0 && buffer[new_line - 1] == '\n') {
+        buffer[new_line - 1] = '\0';
+        new_line--;
+    }
+
     if (new_line < min_len || new_line > max_len) {
         printf("%s", error_msg);
         return false;
     }
 
-    strncpy(var, ALLOCATED_INPUT, new_line);
+    strncpy(var, buffer, new_line);
     var[new_line] = END_OF_RECORD;
     return true;
 }
@@ -452,14 +460,14 @@ void extractFile() {
     fclose(file);
 }
 
-struct student* findByFullName(char fName[], char lName[], int class_id) {
+struct student* findByFullName(char fName[], char lName[], int* class_id) {
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_index = 0; class_index < NUM_CLASSES; class_index++) {
 
             struct student* current_student = S.DB[level][class_index];
             while (current_student != NULL) {
                 if (fullNameMatch(current_student, fName, lName)) {
-                    class_id = class_index;
+                    *class_id = class_index;
                     return current_student;
                 }
                 current_student = current_student->next;
@@ -477,10 +485,10 @@ void initHashMap(HashMap* hashMap) {
 
 void deleteStudent() {
     printf("<::: Delete a student :::>\n");
-    char fName[MAX_LEN], lName[MAX_LEN], ans;
-    int class_id;
+    char fName[MAX_LEN], lName[MAX_LEN];
+    int class_id = 0;
     readFirstNameLastName(fName, lName);
-    struct student* student = findByFullName(fName, lName, class_id);
+    struct student* student = findByFullName(fName, lName, &class_id);
     if (student == NULL)
         return;
     printf(STUDENT_FOUND);
@@ -506,8 +514,9 @@ void deleteStudent() {
 void updateStudent() {
     printf("<::: Update a student :::>\n");
     char fName[MAX_LEN], lName[MAX_LEN];
+    int class_id = 0;
     readFirstNameLastName(fName, lName);
-    struct student* student = findByFullName(fName, lName, 0);
+    struct student* student = findByFullName(fName, lName, &class_id);
     if (student == NULL)
         return;
     printf(STUDENT_FOUND);
