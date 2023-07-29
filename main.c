@@ -35,6 +35,11 @@
 #define DELETE_CONFIRMATION "Are you sure you want to delete this student? (y/n): "
 #define INSERT_GRADES "Enter the grades of the student: \n"
 #define SUBJETCS {"Mathematics", "English", "Cpp","Python", "Java", "C", "C#", "PHP", "HTML", "CSS"}
+#define YES 'y'
+#define NO 'n'
+#define PRESS_TO_CONTINUE "Press Enter To Continue..."
+#define ERROR_READING "Error while reading input"
+#define ERROR_WRITING "Error while writing to file"
 
 #define MAIN "<::: Welcome to the Student Management System :::>\n"\
         "1. Display all students\n"\
@@ -85,23 +90,21 @@ struct school {
 };
 
 const char* SUBJECTS_NAMES[NUM_COURSES] = { "Mathematics", "English", "Cpp","Python", "Java", "C", "C#", "PHP", "HTML", "CSS" };
+
 char* ALLOCATED_INPUT = NULL;
 size_t ALlOC_SIZE = 0;
 
 static struct school S;
-
-// ======================== Function Prototypes ========================
 // For defining a function pointer
 typedef bool (*MatchFunc)(struct student*, char*);
 
-// Function prototypes
-bool fNameMatch(struct student* student, char* fName);
-bool lNameMatch(struct student* student, char* lName);
-bool fullNameMatch(struct student* student, char* fName, char* lName);
-struct student* findByFullName(char* fName, char* lName, int class_id);
+// ======================== Function Prototypes ========================
+
+bool fNameMatch(struct student* student, char fName[]);
+bool lNameMatch(struct student* student, char lName[]);
+bool fullNameMatch(struct student* student, char fName[], char lName[]);
+struct student* findByFullName(char fName[], char lName[], int class_id);
 //void findStudent(MatchFunc match, va_list args);
-
-
 void init_db();
 FILE* open_file();
 void printError(const char* message);
@@ -121,8 +124,6 @@ void extractFile();
 void deleteStudent();
 void getTopStudents();
 void updateStudent();
-// void quickSelect(struct student* arr[], int low, int high, int k, int subject_id);
-// int partition(struct student* arr[], int low, int high, int subject_id);
 double claculate_average(struct student* student);
 bool check_if_failed_in_course(struct student* student);
 void display_candidates();
@@ -144,8 +145,8 @@ bool is_user_confirmed() {
         getc(stdin);
         c = (char)getc(stdin);
         getc(stdin);
-    } while (c != 'y' && c != 'n');
-    return c == 'y';
+    } while (c != YES || c != NO);
+    return c == YES;
 }
 // ===========================================================================
 void displayMenu() {
@@ -185,7 +186,7 @@ void displayMenu() {
             printf(INVALID_INPUT);
             break;
         }
-        printf("Press Enter to continue...\n");
+        printf(PRESS_TO_CONTINUE);
         getc(stdin);
         clrscr();
     }
@@ -195,9 +196,9 @@ void searchStudentBy() {
     printf("<::: Search for a student :::>\n");
     char fName[MAX_LEN], lName[MAX_LEN];
     readFirstNameLastName(fName, lName);
-    printf("Searching...\n");
     struct student* student = findByFullName(fName, lName, 0);
     if (student != NULL) {
+        printf("%s ,lname %s", student->fName, student->lName);
         printf(STUDENT_FOUND);
         displayInfo(student, true);
         printf(LINE_BREAK);
@@ -247,12 +248,21 @@ void init_db() {
     S.num_students = 0;
     int level, class_id, grades[NUM_COURSES];
     char fName[MAX_LEN], lName[MAX_LEN], phone[PHONE_LEN];
-    memset(S.DB, 0, sizeof(S.DB));// initialize the DB to NULL
+    // init to null
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
+            S.DB[level][class_id] = NULL;
+        }
+    }
 
     while (fscanf(file, "%s %s %s %d %d", fName, lName, phone, &level, &class_id) == 5) {
-        struct student* new_student = (student*)malloc(sizeof(struct student));
-        alloc_check(new_student);
-
+        struct student* new_student = malloc(sizeof(struct student));
+        if (new_student == NULL) {
+            printError(ALLOC_ERROR);
+            exit(EXIT_FAILURE);
+        }
+        fName[strcspn(fName, "\n")] = '\0';
+        lName[strcspn(lName, "\n")] = '\0';
         strncpy(new_student->fName, fName, MAX_LEN);
         strncpy(new_student->lName, lName, MAX_LEN);
         strncpy(new_student->phone, phone, PHONE_LEN);
@@ -292,12 +302,12 @@ bool isNextPage(int* count) {
     bool isContinue = true;
     if (*count == STUDENTS_PER_PAGE) {
         *count = 0;
-        printf("Press Enter to continue...\n");
+        printf(PRESS_TO_CONTINUE);
         isContinue = (getc(stdin) == '\n');
     }
     return isContinue;
 }
-
+// This function for opening file for reading/writing
 FILE* open_file(const char* mode, const char* file_name) {
     FILE* file = fopen(file_name, mode);
 
@@ -307,15 +317,14 @@ FILE* open_file(const char* mode, const char* file_name) {
     }
     return file;
 }
-
 void printError(const char* message) {
     fprintf(stderr, "%s", message);
 }
-// display the total number of students
+
 void displayTotalStudents(int count) {
     printf("Total students: %d\n", count);
 }
-
+// This function for display all students info
 void displayStudents() {
     int count = 0, total_students = 0;
     printf("=========== List of Students: ===========\n");
@@ -329,17 +338,17 @@ void displayStudents() {
                 printf(LINE_BREAK);
                 current_student = current_student->next;
                 if (!isNextPage(&count))
-                    break;
+                    return;
             }
         }
     }
     displayTotalStudents(total_students);
 }
-
-
-
-
-
+/***
+ * This function for displaying the info of student
+ * @param student the student to display
+ * @param full_info boolean true-for shownig full info ,no-showing fname and lname
+*/
 void displayInfo(struct student* student, bool full_info) {
     printf("Name: %s %s\n", student->fName, student->lName);
 
@@ -357,7 +366,6 @@ void clrscr() {
 }
 
 void freeMemory() {
-    printf("Freeing memory...\n");
     free(ALLOCATED_INPUT);
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
@@ -380,8 +388,8 @@ bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[
     printf("%s", msg);
     size_t new_line = getline(&ALLOCATED_INPUT, &ALlOC_SIZE, stdin);
     if (new_line == -1) {
-        perror("Error reading input");
-        return false;
+        printError(ERROR_READING);
+        exit(EXIT_FAILURE);
     }
     new_line--;
     if (new_line < min_len || new_line > max_len) {
@@ -403,15 +411,15 @@ bool readDigitInput(int* var, int min, int max, char* msg, char* error_msg) {
     return true;
 }
 
-bool fullNameMatch(struct student* student, char* fName, char* lName) {
+bool fullNameMatch(struct student* student, char fName[], char lName[]) {
     return fNameMatch(student, fName) && lNameMatch(student, lName);
 }
 
-bool fNameMatch(struct student* student, char* fName) {
+bool fNameMatch(struct student* student, char fName[]) {
     return strcmp(student->fName, fName) == 0;
 }
 
-bool lNameMatch(struct student* student, char* lName) {
+bool lNameMatch(struct student* student, char lName[]) {
     return strcmp(student->lName, lName) == 0;
 }
 
@@ -423,17 +431,17 @@ void extractFile() {
             struct student* current_student = S.DB[level][class_id];
             while (current_student != NULL) {
                 if (fprintf(file, "%s %s %s %d %d ", current_student->fName, current_student->lName, current_student->phone, current_student->level, class_id + 1) < 0) {
-                    printError("Error writing to file");
+                    printError(ERROR_WRITING);
                     exit(EXIT_FAILURE);
                 }
                 for (int i = 0; i < NUM_COURSES; i++) {
                     if (fprintf(file, "%d ", current_student->courses[i].grade) < 0) {
-                        printError("Error writing to file");
+                        printError(ERROR_WRITING);
                         exit(EXIT_FAILURE);
                     }
                 }
                 if (fprintf(file, "\n") < 0) {
-                    printError("Error writing to file");
+                    printError(ERROR_WRITING);
                     exit(EXIT_FAILURE);
                 }
                 current_student = current_student->next;
@@ -444,13 +452,14 @@ void extractFile() {
     fclose(file);
 }
 
-struct student* findByFullName(char* fName, char* lName, int class_id) {
+struct student* findByFullName(char fName[], char lName[], int class_id) {
     for (int level = 0; level < NUM_LEVELS; level++) {
-        for (int class = 0; class < NUM_CLASSES; class++) {
-            struct student* current_student = S.DB[level][class_id];
+        for (int class_index = 0; class_index < NUM_CLASSES; class_index++) {
+
+            struct student* current_student = S.DB[level][class_index];
             while (current_student != NULL) {
                 if (fullNameMatch(current_student, fName, lName)) {
-                    class_id = class;
+                    class_id = class_index;
                     return current_student;
                 }
                 current_student = current_student->next;
@@ -461,7 +470,9 @@ struct student* findByFullName(char* fName, char* lName, int class_id) {
     return NULL;
 }
 void initHashMap(HashMap* hashMap) {
-    memset(hashMap, 0, sizeof(HashMap));
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        hashMap->buckets[i] = NULL;
+    }
 }
 
 void deleteStudent() {
@@ -574,13 +585,12 @@ void display_candidates() {
             }
         }
     }
-    displayTotalStudents(count);
+    printf(count == 0 ? "No candidates found.\n" : "Total candidates: %d\n", count);
 }
 // ===========================================================================
  //function to create a new GradeNode
 GradeNode* createGradeNode(struct student* student) {
     GradeNode* newNode = (GradeNode*)malloc(sizeof(GradeNode));
-    check_alloc(newNode);
     newNode->student = student;
     newNode->next = NULL;
     return newNode;
@@ -646,9 +656,9 @@ void getTopStudents() {
     printf("<::: Display top 10 students in a subject :::>\n");
     int subject_id;
     printf("Subjects:\n");
-    for (int i = 0; i < NUM_COURSES; i++) 
+    for (int i = 0; i < NUM_COURSES; i++) {
         printf("%d. %s\n", i, SUBJECTS_NAMES[i]);
-
+    }
     while (!readDigitInput(&subject_id, 0, NUM_COURSES, "Enter the subject id: ", INVALID_INPUT));
     getc(stdin);
     printf("Top 10 students which didn't fail in any course(grade >= %d) in %s:\n", MIN_GRADE, SUBJECTS_NAMES[subject_id]);
