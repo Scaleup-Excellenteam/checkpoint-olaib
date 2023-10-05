@@ -40,6 +40,14 @@
 #define PRESS_TO_CONTINUE "Press Enter To Continue..."
 #define ERROR_READING "Error while reading input"
 #define ERROR_WRITING "Error while writing to file"
+#define AVERAGE_PRE_LEVEL_MSG "Average per course per level:\n";
+#define EXTRACTED_SUCCESSFULLY "Extracted successfully to %s\n"
+#define DISPLAY_CANDIDATES "<::: Display candidates :::>\n";
+#define TOP_STUDENTS_SECTION "<::: Top 10 students in a subject :::>\n"
+#define DELETE_SECTION "<::: Delete a student :::>\n"
+#define UPDATE_SECTION "<::: Update a student :::>\n"
+"<::: Delete a student :::>\n");
+
 
 #define MAIN "<::: Welcome to the Student Management System :::>\n"\
         "0. Display all students\n"\
@@ -101,34 +109,40 @@ typedef bool (*MatchFunc)(struct student*, char*);
 
 // ======================== Function Prototypes ========================
 
-bool fNameMatch(struct student* student, char fName[]);
-bool lNameMatch(struct student* student, char lName[]);
-bool fullNameMatch(struct student* student, char fName[], char lName[]);
-struct student* findByFullName(char fName[], char lName[], int* class_id);
-//void findStudent(MatchFunc match, va_list args);
 void init_db();
-FILE* open_file();
-void printError(const char* message);
 void clrscr();
+FILE* open_file();
 void freeMemory();
-void alloc_check(void* ptr);
-bool is_user_confirmed();
-void displayStudents();
-void displayInfo(struct student* student, bool full_info);
 void displayMenu();
-void insertStudent();
-void readFirstNameLastName(char fName[], char lName[]);
-bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[]);
-bool readDigitInput(int var[], int min, int max, char msg[], char error_msg[]);
-void searchStudentBy();
 void extractFile();
 void deleteStudent();
-void getTopStudents();
 void updateStudent();
-double claculate_average(struct student* student);
-bool check_if_failed_in_course(struct student* student);
+void insertStudent();
+void getTopStudents();
+void searchStudentBy();
+void displayStudents();
 void display_candidates();
+bool is_user_confirmed();
+void updateFirstName(struct student* student);
+void updateLastName(struct student* student);
+void updatePhoneNumber(struct student* student);
+void updateLevel(struct student* student);
+void updateGrades(struct student* student);
+bool readInputWithConfirmation(char[] input, int max_len, char[] prompt, char[] success_msg, char[] error_msg);
+void alloc_check(void* ptr);
 void calculateLevelAverages();
+void printError(const char* message);
+double calculate_average(struct student* student);
+bool fNameMatch(struct student* student, char fName[]);
+bool lNameMatch(struct student* student, char lName[]);
+void readFirstNameLastName(char fName[], char lName[]);
+bool check_if_failed_in_course(struct student* student);
+void displayInfo(struct student* student, bool full_info);
+bool fullNameMatch(struct student* student, char fName[], char lName[]);
+struct student* findByFullName(char fName[], char lName[], int* class_id);
+bool readDigitInput(int var[], int min, int max, char msg[], char error_msg[]);
+bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[]);
+
 // ======================== Main Function ========================
 
 int main() {
@@ -139,7 +153,10 @@ int main() {
 }
 
 // ======================== Function Implementations ========================
-
+/*
+    * This function is used to check if the user confirmed the action
+    * @return true if the user confirmed the action, false otherwise
+    */
 bool is_user_confirmed() {
     char c;
     do {
@@ -150,6 +167,7 @@ bool is_user_confirmed() {
     return c == YES;
 }
 // ===========================================================================
+// This function is used to display the menu and get the user's choice
 void displayMenu() {
     char choice;
     while (1) {
@@ -196,6 +214,7 @@ void displayMenu() {
     }
 }
 // ===========================================================================
+// This function is used to search for a student by first name and last name
 void searchStudentBy() {
     printf("<::: Search for a student :::>\n");
     char fName[MAX_LEN], lName[MAX_LEN];
@@ -210,6 +229,7 @@ void searchStudentBy() {
     }
 }
 // ===========================================================================
+// This function is used to insert a new student
 void insertStudent() {
     printf("<::: ========== Insert a new student ========= :::>\n");
     int class_id;
@@ -237,6 +257,7 @@ void insertStudent() {
     printf(INSERTED_SUCCESSFULLY);
 }
 // ===========================================================================
+// This function is used to check if the memory allocation was successful
 void alloc_check(void* ptr) {
     if (ptr == NULL) {
         printError(ALLOC_ERROR);
@@ -244,18 +265,20 @@ void alloc_check(void* ptr) {
     }
 }
 // ===========================================================================
+// This function is used to initialize the database(DB 2D array) from the input file
 void init_db() {
     FILE* file = open_file("r", DB_INPUT_FILE);
+
     S.num_students = 0;
     int level, class_id, grades[NUM_COURSES];
     char fName[MAX_LEN], lName[MAX_LEN], phone[PHONE_LEN];
-    // init to null
+    // Initialize the DB to NULL
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             S.DB[level][class_id] = NULL;
         }
     }
-
+    // Read the input file and insert the students into the DB
     while (fscanf(file, "%s %s %s %d %d", fName, lName, phone, &level, &class_id) == 5) {
         struct student* new_student = malloc(sizeof(struct student));
         if (new_student == NULL) {
@@ -268,7 +291,7 @@ void init_db() {
         strncpy(new_student->lName, lName, MAX_LEN);
         strncpy(new_student->phone, phone, PHONE_LEN);
         new_student->level = level;
-
+        // Read the grades
         for (int i = 0; i < NUM_CLASSES; i++) {
             if (fscanf(file, "%d", &grades[i]) != 1) {
                 printError(INVALID_INPUT);
@@ -280,7 +303,7 @@ void init_db() {
         // Insert the new student into the linked list for the corresponding level and class_id
         new_student->next = NULL;
         new_student->prev = NULL;
-
+        // Insert the new student into the linked list for the corresponding level and class_id
         if (S.DB[level - 1][class_id - 1] == NULL) {
             S.DB[level - 1][class_id - 1] = new_student;
         }
@@ -298,7 +321,11 @@ void init_db() {
     fclose(file);
 }
 // ===========================================================================
-// This function is used to display the students in pages
+/*
+    * This function is used to display the students in pages
+    * @param count pointer to the count of students displayed
+    * @return true if the user wants to continue to the next page, false otherwise
+*/
 bool isNextPage(int* count) {
     bool isContinue = true;
     if (*count == STUDENTS_PER_PAGE) {
@@ -318,6 +345,8 @@ FILE* open_file(const char* mode, const char* file_name) {
     }
     return file;
 }
+
+// This function for printing error message
 void printError(const char* message) {
     fprintf(stderr, "%s", message);
 }
@@ -365,6 +394,7 @@ void displayInfo(struct student* student, bool full_info) {
 void clrscr() {
     system("@cls||clear");
 }
+// ===========================================================================
 
 void freeMemory() {
     free(ALLOCATED_INPUT);
@@ -379,12 +409,25 @@ void freeMemory() {
         }
     }
 }
-
+/*
+    * This function for reading first name and last name
+    * @param fName first name
+    * @param lName last name
+*/
 void readFirstNameLastName(char fName[], char lName[]) {
     while (!readInput(fName, MAX_LEN, 1, INSERT_FNAME, INVALID_INPUT));
     while (!readInput(lName, MAX_LEN, 1, INSERT_LNAME, INVALID_INPUT));
 }
-
+// ===========================================================================
+/*
+    * This function for reading input from user
+    * @param var the variable to store the input in
+    * @param max_len the maximum length of the input
+    * @param min_len the minimum length of the input
+    * @param msg the message to display to the user when asking for input
+    * @param error_msg the error message to display to the user when the input is invalid
+    * @return true if the input is valid, false otherwise
+*/
 bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[]) {
     printf("%s", msg);
 
@@ -409,7 +452,15 @@ bool readInput(char var[], int max_len, int min_len, char msg[], char error_msg[
     var[new_line] = END_OF_RECORD;
     return true;
 }
-
+/*
+    * This function for reading digit input from user
+    * @param var the variable to store the input in
+    * @param min the minimum value of the input
+    * @param max the maximum value of the input
+    * @param msg the message to display to the user when asking for input
+    * @param error_msg the error message to display to the user when the input is invalid
+    * @return true if the input is valid, false otherwise
+*/
 bool readDigitInput(int* var, int min, int max, char* msg, char* error_msg) {
     printf("%s", msg);
     if (scanf("%d", var) != 1 || *var < min || *var > max) {
@@ -430,7 +481,7 @@ bool fNameMatch(struct student* student, char fName[]) {
 bool lNameMatch(struct student* student, char lName[]) {
     return strcmp(student->lName, lName) == 0;
 }
-
+// Ths function for extracting the DB to a file
 void extractFile() {
     printf("Extracting...\n");
     FILE* file = open_file("w", SAVE_FILE_NAME);
@@ -456,10 +507,16 @@ void extractFile() {
             }
         }
     }
-    printf("File extracted successfully to %s\n", SAVE_FILE_NAME);
+    printf(EXTRACTED_SUCCESSFULLY, SAVE_FILE_NAME);
     fclose(file);
 }
-
+/*
+    * This function for finding student by full name
+    * @param fName first name
+    * @param lName last name
+    * @param class_id the class id of the student
+    * @return the student if found, NULL otherwise
+*/
 struct student* findByFullName(char fName[], char lName[], int* class_id) {
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_index = 0; class_index < NUM_CLASSES; class_index++) {
@@ -477,6 +534,7 @@ struct student* findByFullName(char fName[], char lName[], int* class_id) {
     printf(STUDENT_NOT_FOUND);
     return NULL;
 }
+// This function for initializing the hashmap to NULL
 void initHashMap(HashMap* hashMap) {
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
         hashMap->buckets[i] = NULL;
@@ -484,7 +542,7 @@ void initHashMap(HashMap* hashMap) {
 }
 
 void deleteStudent() {
-    printf("<::: Delete a student :::>\n");
+    printf(DELETE_SECTION);
     char fName[MAX_LEN], lName[MAX_LEN];
     int class_id = 0;
     readFirstNameLastName(fName, lName);
@@ -512,7 +570,7 @@ void deleteStudent() {
 }
 
 void updateStudent() {
-    printf("<::: Update a student :::>\n");
+    printf(UPDATE_SECTION);
     char fName[MAX_LEN], lName[MAX_LEN];
     int class_id = 0;
     readFirstNameLastName(fName, lName);
@@ -522,26 +580,50 @@ void updateStudent() {
     printf(STUDENT_FOUND);
     displayInfo(student, true);
     printf(LINE_BREAK);
-    // ask user for confirmation
+    // ask user for confirmation and update the student
+    printf("first name? (y/n): ");
+    updateFirstName(student);
+    updateLastName(student);
+    updatePhoneNumber(student);
+    updateLevel(student);
+    updateGrades(student);
+
+    printf(STUDENT_UPDATED);
+}
+
+void updateFirstName(struct student* student) {
+    printf(UPDATE);
     printf("first name? (y/n): ");
     if (is_user_confirmed()) {
         while (!readInput(student->fName, MAX_LEN, 2, INSERT_LNAME, INVALID_INPUT));
     }
+}
+
+void updateLastName(struct student* student) {
     printf(UPDATE);
     printf("last name? (y/n): ");
     if (is_user_confirmed()) {
         while (!readInput(student->lName, MAX_LEN, 2, INSERT_LNAME, INVALID_INPUT));
     }
+}
+
+void updatePhoneNumber(struct student* student) {
     printf(UPDATE);
     printf("phone number? (y/n): ");
     if (is_user_confirmed()) {
         while (!readInput(student->phone, PHONE_LEN, PHONE_LEN, INSERT_PHONE, INVALID_INPUT));
     }
+}
+
+void updateLevel(struct student* student) {
     printf(UPDATE);
     printf("level? (y/n): ");
     if (is_user_confirmed()) {
         while (!readDigitInput(&student->level, 1, NUM_LEVELS, INSERT_LEVEL, INVALID_INPUT));
     }
+}
+
+void updateGrades(struct student* student) {
     printf(UPDATE);
     printf("grades? (y/n): ");
     if (is_user_confirmed()) {
@@ -551,17 +633,41 @@ void updateStudent() {
             while (!readDigitInput(&student->courses[i].grade, 0, 100, INSERT_GRADE, INVALID_INPUT));
         }
     }
-    printf(STUDENT_UPDATED);
+}
+/* This function is reusable for reading input with confirmation
+    * @param input the input to read
+    * @param max_len the maximum length of the input
+    * @param prompt the prompt to display to the user when asking for input
+    * @param success_msg the message to display to the user when the input is valid
+    * @param error_msg the error message to display to the user when the input is invalid
+    * @return true if the input is valid, false otherwise
+*/
+bool readInputWithConfirmation(char[] input, int max_len, char[] prompt, char[] success_msg, char[] error_msg){
+    printf("%s (y/n): ", prompt);
+    if (is_user_confirmed()) {
+        while (!readInput(input, max_len, 2, prompt, error_msg));
+        printf("%s", success_msg);
+        return true;
+    }
+    return false;
 }
 
-double claculate_average(struct student* student) {
+
+/*  This function for calculating the average per course per level
+    * @return void
+*/
+double calculate_average(struct student* student) {
     double average = 0;
     for (int i = 0; i < NUM_COURSES; i++) {
         average += student->courses[i].grade;
     }
     return average / NUM_COURSES;
 }
-
+/*
+    * This function for checking if the student has failed in any course
+    * @param student the student to check
+    * @return true if the student has failed in any course, false otherwise
+*/
 bool check_if_failed_in_course(struct student* student) {
     for (int i = 0; i < NUM_COURSES; i++)
         if (student->courses[i].grade < MIN_GRADE)
@@ -572,13 +678,13 @@ bool check_if_failed_in_course(struct student* student) {
 
 // Function to find candidates with average < 60 or grades < 55 
 void display_candidates() {
-    printf("<::: Display candidates :::>\n");
+    printf(DISPLAY_CANDIDATES);
     int count = 0;
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class_id = 0; class_id < NUM_CLASSES; class_id++) {
             struct student* current_student = S.DB[level][class_id];
             while (current_student != NULL) {
-                double average = claculate_average(current_student);
+                double average = calculate_average(current_student);
                 bool has_failed_course = check_if_failed_in_course(current_student);
                 if (average < MIN_AVERAGE || has_failed_course) {
                     count++;
@@ -596,7 +702,11 @@ void display_candidates() {
     printf(count == 0 ? "No candidates found.\n" : "Total candidates: %d\n", count);
 }
 // ===========================================================================
- //function to create a new GradeNode
+ /*
+    * This function for creating a new node in the linked list of the same grade
+    * @param student the student to insert
+    * @return the new node
+*/
 GradeNode* createGradeNode(struct student* student) {
     GradeNode* newNode = (GradeNode*)malloc(sizeof(GradeNode));
     newNode->student = student;
@@ -604,14 +714,21 @@ GradeNode* createGradeNode(struct student* student) {
     return newNode;
 }
 
-// Function to insert a student into the linked list of the same grade
+/* Function to insert a student into the linked list of the same grade
+    * @param head the head of the linked list
+    * @param student the student to insert
+    * @return the new head of the linked list
+*/
 GradeNode* insertGradeNode(GradeNode* head, struct student* student) {
     GradeNode* newNode = createGradeNode(student);
     newNode->next = head;
     return newNode;
 }
 
-// Function to retrieve the top 10 students
+/* Function to retrieve the top 10 students
+    * @param head the head of the linked list
+    * @return void
+*/
 void getTopStudentsFromGradeList(GradeNode* head) {
     int count = 0;
     while (head != NULL && count < TOP_STUDENTS_LIMIT) {
@@ -621,16 +738,23 @@ void getTopStudentsFromGradeList(GradeNode* head) {
     }
 }
 
-/* Function to hash the grade to an index in the hashmap from 0 to 45
- * 0 -> grade 55
- * 45 -> grade 100
- */
-
+/* Function to hash the grade to an index in the hashmap from 0 to 45 (46 indices)
+ * The grade is hashed as follows:
+ * 0 -> grade 55: in table index 0 represents grade 55
+ * 45 -> grade 100: in table index 45 represents grade 100
+ * @param grade the grade to hash
+ * @return the index in the hashmap
+*/
 int hashGrade(int grade) {
     return grade - MIN_GRADE;
 }
 
-// Function to insert a student into the hashmap
+/*  Function to insert a student into the hashmap
+    * @param hashMap the hashmap
+    * @param student the student to insert
+    * @param subject_id the subject id
+    * @return void
+*/
 void insertStudentToHashMap(HashMap* hashMap, struct student* student, int subject_id) {
     int grade = student->courses[subject_id].grade;
     int index = hashGrade(grade);
@@ -638,7 +762,11 @@ void insertStudentToHashMap(HashMap* hashMap, struct student* student, int subje
     hashMap->buckets[index] = insertGradeNode(hashMap->buckets[index], student);
 }
 
-// Function to get the top 10 students for a given level from the hashmap
+/* Function to get the top 10 students for a given level from the hashmap
+    * @param hashMap the hashmap
+    * @param level the level
+    * @return void
+*/
 void getTopStudentsForLevel(HashMap* hashMap, int level) {
     int count = 0;
     for (int i = HASH_TABLE_SIZE - 1; i >= 0 && count < TOP_STUDENTS_LIMIT; i--) {
@@ -661,7 +789,7 @@ void getTopStudentsForLevel(HashMap* hashMap, int level) {
     * 3. Iterate over the hashmap from the end and retrieve the top 10 students for each level
 */
 void getTopStudents() {
-    printf("<::: Display top 10 students in a subject :::>\n");
+    printf(TOP_STUDENTS_SECTION);
     int subject_id;
     printf("Subjects:\n");
     for (int i = 0; i < NUM_COURSES; i++) {
@@ -716,7 +844,7 @@ void calculateLevelAverages() {
             }
         }
     }
-    printf("Average per course per level:\n");
+    printf(AVERAGE_PRE_LEVEL_MSG);
     for (int level = 0; level < NUM_LEVELS; level++) {
         double average = (double)total_grades[level] / total_courses[level];
         printf("Level %d: %.2lf\n", level + 1, average);
